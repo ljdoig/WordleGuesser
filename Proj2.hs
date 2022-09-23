@@ -18,7 +18,11 @@ data Pitch = Pitch Char Int
 instance Show Pitch where
   show (Pitch note oct) = [note, head (show oct)]
 
-newtype GameState = GameState [[Pitch]]
+type Chord = [Pitch]
+
+newtype GameState = GameState [Chord]
+
+type Feedback = (Int, Int, Int)
 
 notes = ['A' .. 'G']
 
@@ -41,12 +45,12 @@ toPitch [note, octChar]
     oct = digitToInt octChar
 toPitch _ = Nothing
 
-feedback :: [Pitch] -> [Pitch] -> (Int, Int, Int)
+feedback :: Chord -> Chord -> Feedback
 feedback target guess = (samePitch, sameNote - samePitch, sameOct - samePitch)
   where
     samePitch = countCommon target guess
-    (targetNotes, targetOcts) = splitPitches target
-    (guessNotes, guessOcts) = splitPitches guess
+    (targetNotes, targetOcts) = splitChord target
+    (guessNotes, guessOcts) = splitChord guess
     sameNote = countCommon targetNotes guessNotes
     sameOct = countCommon targetOcts guessOcts
 
@@ -56,15 +60,17 @@ countCommon (x : xs) ys
   | otherwise = countCommon xs ys
 countCommon [] _ = 0
 
-splitPitches :: [Pitch] -> ([Char], [Int])
-splitPitches [] = ([], [])
-splitPitches (Pitch note oct : tail) = (note : notes, oct : octs)
+splitChord :: Chord -> ([Char], [Int])
+splitChord [] = ([], [])
+splitChord (Pitch note oct : tail) = (note : notes, oct : octs)
   where
-    (notes, octs) = splitPitches tail
+    (notes, octs) = splitChord tail
 
-initialGuess :: ([Pitch], GameState)
+initialGuess :: (Chord, GameState)
 initialGuess = (head chords, GameState (tail chords))
 
-nextGuess :: ([Pitch], GameState) -> (Int, Int, Int) -> ([Pitch], GameState)
-nextGuess (_, GameState (x : xs)) _ = (x, GameState xs)
-nextGuess _ _ = error "no guesses left"
+nextGuess :: (Chord, GameState) -> Feedback -> (Chord, GameState)
+nextGuess (guess, GameState options) yourFeedback =
+  (head newOptions, GameState (tail newOptions))
+  where
+    newOptions = filter ((== yourFeedback) . feedback guess) options
