@@ -5,12 +5,16 @@ module Proj2
     GameState,
     initialGuess,
     nextGuess,
+    Chord,
+    Feedback,
+    chords,
   )
 where
 
 import Data.Char (digitToInt)
-import Data.List (delete, sort)
+import Data.List (delete, group, maximumBy, sort)
 import Data.Maybe (fromJust)
+import Data.Ord (comparing)
 
 data Pitch = Pitch Char Int
   deriving (Eq, Ord)
@@ -28,7 +32,7 @@ notes = ['A' .. 'G']
 
 octs = [1 .. 3]
 
-pitches = [Pitch n o | n <- notes, o <- octs]
+pitches = [Pitch n o | o <- octs, n <- notes]
 
 chords =
   [ [pitches !! i, pitches !! j, pitches !! k]
@@ -67,10 +71,20 @@ splitChord (Pitch note oct : tail) = (note : notes, oct : octs)
     (notes, octs) = splitChord tail
 
 initialGuess :: (Chord, GameState)
-initialGuess = (head chords, GameState (tail chords))
+initialGuess = (guess, GameState (delete guess chords))
+  where
+    guess = map (fromJust . toPitch) ["G2", "E3", "F3"]
 
 nextGuess :: (Chord, GameState) -> Feedback -> (Chord, GameState)
 nextGuess (guess, GameState options) yourFeedback =
-  (head newOptions, GameState (tail newOptions))
+  (nextGuess, GameState (delete nextGuess newOptions))
   where
     newOptions = filter ((== yourFeedback) . feedback guess) options
+    metric = guessScore newOptions
+    nextGuess = maximumBy (comparing metric) newOptions
+
+guessScore :: [Chord] -> Chord -> Int
+guessScore options guess = - maximum (counts (map (feedback guess) options))
+
+counts :: Ord a => [a] -> [Int]
+counts = map length . group . sort
