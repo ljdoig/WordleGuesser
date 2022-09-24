@@ -7,7 +7,7 @@ module Proj2
     nextGuess,
     Chord,
     Feedback,
-    chords,
+    allChords,
   )
 where
 
@@ -34,7 +34,7 @@ octs = [1 .. 3]
 
 pitches = [Pitch n o | o <- octs, n <- notes]
 
-chords =
+allChords =
   [ [pitches !! i, pitches !! j, pitches !! k]
     | i <- [0 .. length pitches - 1],
       j <- [i + 1 .. length pitches - 1],
@@ -49,6 +49,9 @@ toPitch [note, octChar]
     oct = digitToInt octChar
 toPitch _ = Nothing
 
+toChord :: String -> [Pitch]
+toChord = fromJust . mapM toPitch . words
+
 feedback :: Chord -> Chord -> Feedback
 feedback target guess = (samePitch, sameNote - samePitch, sameOct - samePitch)
   where
@@ -59,32 +62,31 @@ feedback target guess = (samePitch, sameNote - samePitch, sameOct - samePitch)
     sameOct = countCommon targetOcts guessOcts
 
 countCommon :: Eq a => [a] -> [a] -> Int
+countCommon [] _ = 0
 countCommon (x : xs) ys
   | x `elem` ys = 1 + countCommon xs (delete x ys)
   | otherwise = countCommon xs ys
-countCommon [] _ = 0
 
 splitChord :: Chord -> ([Char], [Int])
-splitChord [] = ([], [])
-splitChord (Pitch note oct : tail) = (note : notes, oct : octs)
-  where
-    (notes, octs) = splitChord tail
+splitChord [Pitch n1 o1, Pitch n2 o2, Pitch n3 o3] = ([n1, n2, n3], [o1, o2, o3])
+splitChord _ = error "invalid chord"
 
 initialGuess :: (Chord, GameState)
-initialGuess = (guess, GameState (delete guess chords))
+initialGuess = (guess, GameState (delete guess allChords))
   where
-    guess = map (fromJust . toPitch) ["G2", "E3", "F3"]
+    guess = toChord "G2 E3 F3"
 
 nextGuess :: (Chord, GameState) -> Feedback -> (Chord, GameState)
-nextGuess (guess, GameState options) yourFeedback =
-  (nextGuess, GameState (delete nextGuess newOptions))
+nextGuess (guess, GameState targets) yourFeedback =
+  (nextGuess, GameState (delete nextGuess remainingTargets))
   where
-    newOptions = filter ((== yourFeedback) . feedback guess) options
-    metric = guessScore newOptions
-    nextGuess = maximumBy (comparing metric) newOptions
+    remainingTargets = filter ((== yourFeedback) . feedback guess) targets
+    scoreOrdering = comparing (guessScore remainingTargets)
+    nextGuess = maximumBy scoreOrdering remainingTargets
 
 guessScore :: [Chord] -> Chord -> Int
-guessScore options guess = - maximum (counts (map (feedback guess) options))
-
-counts :: Ord a => [a] -> [Int]
-counts = map length . group . sort
+guessScore targets guess = - sumOfSquares (countDistinct potentialFeedbacks)
+  where
+    potentialFeedbacks = map (feedback guess) targets
+    countDistinct = map length . group . sort
+    sumOfSquares = sum . map (^ 2)
