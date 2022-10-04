@@ -64,76 +64,87 @@ import Data.Maybe (fromJust)
 import Data.Ord (comparing)
 import Text.Read (readMaybe)
 
+-- | A note type, enumerating all possible notes in a pitch.
 data Note = A | B | C | D | E | F | G
   deriving (Eq, Read, Show, Enum, Bounded)
-
+  
+-- | An octave type, enumerating all possible octaves in a pitch.
 data Octave = O1 | O2 | O3
   deriving (Eq, Read, Show, Enum, Bounded)
 
+-- | A pitch type, made up of both a note and an octave. Shown as a simple
+-- two-character string e.g. show (Pitch A O1) -> "A1".
 data Pitch = Pitch Note Octave
-  deriving (Eq)
-
+  deriving Eq
 instance Show Pitch where show (Pitch note oct) = show note ++ tail (show oct)
 
-newtype GameState = GameState [Chord]
-
+-- | A chord type-synonym. Chords are represented as a list of 3 pitches.
 type Chord = [Pitch]
 
+-- | A game-state type, representing the list of chords that are still possible
+-- to guess at a given point in the game, based on all the feedback for guesses 
+-- so far. Initially, this will just be every possible chord.
+newtype GameState = GameState [Chord]
+
+-- | A feedback type-synonym. Feedback is given as a tuple of 3 integers, 
+-- according to the rules described above.
 type Feedback = (Int, Int, Int)
 
 -- | List containing all possible pitches, the cartesian product of the set of
 -- all notes and set of all octaves. Used to generate all possible chords.
 allPitches :: [Pitch]
-allPitches = [Pitch note octave | note <- [minBound ..], octave <- [minBound ..]]
+allPitches = [Pitch note octave | note <- [minBound..], octave <- [minBound..]]
 
 -- | List containing all possible chords, each of which is a list of pitches of
 -- length 3 with no repeated pitches. Starting point for possible guesses.
 allChords :: [Chord]
 allChords = filter ((== 3) . length) (subsequences allPitches)
 
--- | Parses a string describing a pitch, returning the corresponding
--- 'Just Pitch' if the string represents a valid pitch, and Nothing otherwise.
+-- | Parses a string describing a pitch, returning the corresponding 
+-- 'Just Pitch' for a 2-character string representing a valid pitch, and Nothing 
+-- otherwise. E.g. toPitch "A3" -> Just (Pitch A O3) ; toPitch "A4" -> Nothing
 toPitch :: String -> Maybe Pitch
 toPitch [noteChar, octaveChar] =
   case (readMaybe [noteChar], readMaybe ['O', octaveChar]) of
     (Just note, Just octave) -> Just (Pitch note octave)
     _ -> Nothing
 toPitch _ = Nothing
-
--- | Provides feedback on a given guess with respect to a target, as described
--- above. Note that this function is commutative, so we can write either
--- 'feedback guess target' or 'feedback target guess'.
+    
+-- | Takes two chords, a guess and a target, and returns feedback according
+-- to the rules described above. This function is commutative, so 
+-- 'feedback guess target' and 'feedback target guess' are identical.
 feedback :: Chord -> Chord -> Feedback
 feedback guess target =
   (numSamePitch, numSameNote - numSamePitch, numSameOctave - numSamePitch)
-  where
-    numSamePitch = numCommonElements target guess
-    (targetNotes, targetOctaves) = splitChord target
-    (guessNotes, guessOctaves) = splitChord guess
-    numSameNote = numCommonElements targetNotes guessNotes
-    numSameOctave = numCommonElements targetOctaves guessOctaves
+  where numSamePitch = numCommonElements target guess
+        (targetNotes, targetOctaves) = splitChord target
+        (guessNotes, guessOctaves) = splitChord guess
+        numSameNote = numCommonElements targetNotes guessNotes
+        numSameOctave = numCommonElements targetOctaves guessOctaves
 
--- | Takes two lists and counts how many elements are common to both lists.
--- Repeated elements are only counted if they are repeated in both lists, so
--- that 'numCommonElements [1,1,2] [1,2,2]' evaluates to 2.
+-- | Takes two lists whose elements can be compared for equality, and returns
+-- the number of elements that are common to both lists. Repeated elements are 
+-- only counted if they are repeated in both lists, so 
+-- numCommonElements [1,1,2] [1,2,2] -> 2.
 numCommonElements :: Eq a => [a] -> [a] -> Int
 numCommonElements [] _ = 0
-numCommonElements (x : xs) ys
+numCommonElements (x:xs) ys
   | x `elem` ys = 1 + numCommonElements xs (delete x ys)
   | otherwise = numCommonElements xs ys
 
--- | Splits a chord, turning its 3 pitches into a list of 3 notes and 3 octaves.
+-- | Takes a chord and splits it into a tuple containing a list of 3 notes and a
+-- list of 3 octaves.
 splitChord :: Chord -> ([Note], [Octave])
-splitChord [Pitch n1 o1, Pitch n2 o2, Pitch n3 o3] = ([n1, n2, n3], [o1, o2, o3])
+splitChord [Pitch n1 o1, Pitch n2 o2, Pitch n3 o3] = ([n1,n2,n3], [o1,o2,o3])
 splitChord _ = error "invalid chord, should have exactly 3 pitches"
 
--- | The first chord guessed and the list of remaining targets to guess in
--- future. The guess was initially calculated using 'maxEntropyGuess allChords',
--- but was then hardcoded to save time, as the result will never change.
+-- | A tuple containing the first chord guessed and the list of remaining 
+-- targets to guess in future. The guess was initially calculated using 
+-- 'maxEntropyGuess allChords', but was then hardcoded to save time, as the 
+-- result will never change.
 initialGuess :: (Chord, GameState)
 initialGuess = (guess, GameState (delete guess allChords))
-  where
-    guess = map (fromJust . toPitch) ["E2", "F3", "G3"]
+  where guess = map (fromJust . toPitch) ["E2","F3","G3"]
 
 -- | Takes in the guessed chord and remaining targets from the previous turn,
 -- as well as the feedback given from this guess. The targets are filtered down
@@ -142,13 +153,12 @@ initialGuess = (guess, GameState (delete guess allChords))
 nextGuess :: (Chord, GameState) -> Feedback -> (Chord, GameState)
 nextGuess (oldGuess, GameState oldTargets) yourFeedback =
   (newGuess, GameState (delete newGuess newTargets))
-  where
-    newTargets = consistentTargets yourFeedback oldGuess oldTargets
-    newGuess = maxEntropyGuess newTargets
+  where newTargets = consistentTargets yourFeedback oldGuess oldTargets
+        newGuess = maxEntropyGuess newTargets
 
--- | Takes a feedback, the guess that generated the feedback and a list of
--- targets. Filters these targets down to those that are consistent with the
--- feedback, meaning that for the given guess they generate the same feedback.
+-- | Takes a feedback, the guess that generated the feedback and a list of 
+-- targets. Returns a filtered list of targets, containing only those consistent 
+-- with the feedback, i.e. for the given guess they generate the same feedback.
 consistentTargets :: Feedback -> Chord -> [Chord] -> [Chord]
 consistentTargets yourFeedback guess =
   filter ((== yourFeedback) . feedback guess)
@@ -158,28 +168,28 @@ consistentTargets yourFeedback guess =
 maxEntropyGuess :: [Chord] -> Chord
 maxEntropyGuess targets = maximumBy (comparing (guessEntropy targets)) targets
 
--- | Takes a list of targets and a potential guess. Calculates all the feedbacks
--- that could be received from the targets if that guess was made, and returns
+-- | Takes a list of targets and a potential guess. Calculates all the feedbacks 
+-- that could be received from the targets if that guess was made, and returns 
 -- the entropy of that feedback.
 guessEntropy :: [Chord] -> Chord -> Double
 guessEntropy targets guess = entropy potentialFeedbacks
-  where
-    potentialFeedbacks = map (feedback guess) targets
+  where potentialFeedbacks = map (feedback guess) targets
 
--- | Calculates Shannon's entropy in bits.
+-- | Takes a list containing elements of an ordered type. Returns Shannon's
+-- entropy of the list in bits.
 entropy :: Ord a => [a] -> Double
 entropy xs = sum [- p * logBase 2 p | p <- elementDistribution xs]
 
--- | For each distinct element of a list, calculates what proportion of the
--- list contains that element. E.g. 'normalisedFrequencies "aaba"' gives
--- [0.75,0.25], as 3/4 of the list is 'a' and 1/4 of the list is 'b'.
+-- | Takes a list containing elements of an ordered type. For each distinct 
+-- element, calculates what proportion of the list contains that element. 
+-- E.g. elementDistribution "aaba" -> [0.75,0.25], as 3/4 of the list is 'a' and 
+-- 1/4 of the list is 'b'.
 elementDistribution :: Ord a => [a] -> [Double]
 elementDistribution xs = [freq `floatDiv` length xs | freq <- frequencies xs]
-  where
-    floatDiv x y = fromIntegral x / fromIntegral y
+  where floatDiv x y = fromIntegral x / fromIntegral y
 
--- | For each distinct element of a list, counts how many times the element
--- occurs. E.g. 'frequencies "aaba"' gives [3,1], as 'a' appears 3 times and
--- 'b' appears once.
+-- | Takes a list containing elements of an ordered type. For each distinct 
+-- element of a list, counts how many times the element occurs. 
+-- E.g. frequencies "aaba" -> [3,1], as 'a' occurs 3 times and 'b' occurs once.
 frequencies :: Ord a => [a] -> [Int]
 frequencies = map length . group . sort
