@@ -97,7 +97,7 @@ guessQuick target = do
   let (guess, other) = initialGuess
   out <- loopQuick target guess other 1
   stop <- getCurrentTime
-  print $ diffUTCTime stop start
+  --print $ diffUTCTime stop start
   return out
 
 guessTestsQuick :: Int -> [Chord] -> IO [Int]
@@ -150,17 +150,16 @@ randomList n lower upper =
     return (take n rs)
 
 main = do
-  args <- getArgs -- IO [String]
-  let chordIndices = [0 .. 1329]
-  --chordIndices <- randomList 10 0 1329
-  let n = length chordIndices
-  guesses <- guessTestsQuick 0 [allChords !! fromIntegral i | i <- chordIndices]
-  let average = sum guesses `floatDiv` n
-  let marks = sum [4.3 / fromIntegral guess | guess <- guesses]
-  putStrLn (if marks < fromIntegral n then show marks ++ "*" else show marks)
-  putStrLn ("average guesses: " ++ show average)
-  where
-    floatDiv x y = fromIntegral x / fromIntegral y
+  chordIndices <- randomList 9 0 1329
+  let n = 1 + (fromIntegral . length) chordIndices
+  guesses' <- guessTestsQuick 0 [allChords !! fromIntegral i | i <- chordIndices]
+  let guesses = (3:guesses')
+  let average = (fromIntegral . sum) guesses / n
+  let marks = sum [4.3 / fromIntegral guess | guess <- guesses] * 50 / n
+  putStrLn $ if marks < n then show marks ++ "*" else show marks
+  putStrLn $ "rounded: " ++ show (min marks 50)
+  putStrLn $ "average guesses: " ++ show average
+  putStrLn ""
 
 mainLong = do
   args <- getArgs -- IO [String]
