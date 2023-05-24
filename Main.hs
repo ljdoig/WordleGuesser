@@ -1,47 +1,43 @@
---  Author   : Peter Schachte
---  Purpose  : Test program
---  Copyright: (c) 2020 The University of Melbourne
-
--- TESTING CODE.  DO NOT EDIT.
-
 module Main where
 
-import Data.List
-import Data.Maybe
-import Proj2
+import System.IO (BufferMode (NoBuffering), hSetBuffering, stdout)
+import Wordle
+import WordleGuesser (guesser)
 
+type GetNextGuess state = ((Guess, state) -> GuessFeedback -> (Guess, state))
 
--- | Guess the given target, counting and showing the guesses.
-guessTest :: [Pitch] -> IO ()
-guessTest target = do
-      let (guess,other) = initialGuess
-      loop target guess other 1
-
-
--- | Given a target and guess and a guess number, continue guessing
--- until the right target is guessed.
-loop :: [Pitch] -> [Pitch] -> GameState -> Int -> IO ()
-loop target guess other guesses = do
-  putStrLn $ "Your guess #" ++ show guesses ++ ":  " ++ show guess
-  let answer = feedback target guess
-  putStrLn $ "    My answer:  " ++ show answer
-  if answer == (3,0,0)
+-- | Given the correct answer, a guess, the guessers game state and a guess number,
+--   continue until the right answer is guessed or 6 guesses have been made.
+loop :: Answer -> GetNextGuess state -> Guess -> state -> Int -> IO ()
+loop answer getNextGuess guess gameState guessNum = do
+  putStrLn $ "Guess #" ++ show guessNum ++ ":  " ++ guess
+  let feedback = getFeedback answer guess
+  putStrLn $ "Feedback:  " ++ show feedback
+  if hasWon feedback
     then do
-      putStrLn $ "You got it in " ++ show guesses ++ " guesses!"
+      putStrLn $ "WordleGuesser got it in " ++ show guessNum ++ " guesses!"
+    else
+      if guessNum == numAllowedGuesses
+        then do
+          putStrLn "WordleGuesser didn't get it..."
+        else do
+          let (guess', gameState') = getNextGuess (guess, gameState) feedback
+          loop answer getNextGuess guess' gameState' (guessNum + 1)
+
+runWordleGuesser :: [Answer] -> [Guess] -> IO ()
+runWordleGuesser answers guesses = do
+  putStrLn "What word would you like the WordleGuesser to guess?"
+  answer <- getLine
+  if answer `elem` answers
+    then do
+      let Guesser initialGuess getNextGuess = guesser
+      let (guess, gameState) = initialGuess answers guesses
+      loop answer getNextGuess guess gameState 1
     else do
-      let (guess',other') = nextGuess (guess,other) answer
-      loop target guess' other' (guesses+1)
+      putStrLn "Invalid answer, try again"
+      runWordleGuesser answers guesses
 
-
--- | Parse a string containing a number of space-separated pitches to produce
--- a list of pitches.  Error if any of the pitches can't be parsed.
-toChord :: String -> [Pitch]
-toChord = (fromJust . mapM toPitch . words)
-
-
--- | Prompt for a target and use guessTest to try to guess it.
 main :: IO ()
 main = do
-  putStr "Target chord (3 pitches separated by spaces): "
-  text <- getLine
-  guessTest $ toChord text
+  hSetBuffering stdout NoBuffering
+  runWordleGuesser [] []
