@@ -11,7 +11,7 @@ type GetNextGuess state = ((Guess, state) -> GuessFeedback -> (Guess, state))
 loop :: Answer -> GetNextGuess state -> Guess -> state -> Int -> IO ()
 loop answer getNextGuess guess gameState guessNum = do
   putStrLn $ "Guess #" ++ show guessNum ++ ":  " ++ guess
-  let feedback = getFeedback answer guess
+  let feedback = getFeedback guess answer
   putStrLn $ "Feedback:  " ++ show feedback
   if hasWon feedback
     then do
@@ -34,10 +34,12 @@ runWordleGuesser answers guesses = do
       let (guess, gameState) = initialGuess answers guesses
       loop answer getNextGuess guess gameState 1
     else do
-      putStrLn "Invalid answer, try again"
+      putStrLn "That's not in my list of valid Wordle answers, try again"
       runWordleGuesser answers guesses
 
 main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
-  runWordleGuesser [] []
+  answers <- lines <$> readFile "wordlists/wordle_answers.txt"
+  -- guesses <- lines <$> readFile "wordlists/wordle_guesses.txt"
+  runWordleGuesser answers answers
