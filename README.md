@@ -1,10 +1,18 @@
-# Guessing and checking logic for a Mastermind-esque logical guessing game
+# WordleGuesser - a Wordle playing program
+WordleGuesser uses an entropy-based approach to select the guess that gives the most information about the target word.
 
-This project was completed as part of the subject Declarative Programming
-(COMP30020). It uses an entropy-based approach to select the optimal guess. The
-game itself is in the same vein as [Mastermind](https://en.wikipedia.org/wiki/Mastermind_(board_game)).
+To be more specific, each guess we trim down the set of remaining targets to the ones consistent with the feedback we 
+received from our last guess. 
+A potential guess is then evaluated by calculating all the feedbacks that could be received from the remaining targets. 
+We then calulate the entropy of these feedbacks, to provide a score for this potential guess. 
+Higher entropy is desirable as it means the feedbacks are more evenly distributed, so the true feedback we receive
+contains high information and is likely to cut down the remaining targets as much as possible.
 
-[Proj2.hs](https://github.com/ljdoig/GuessTheChord/blob/main/Proj2.hs) is my 
-code, which includes a detailed description of the game. 
-[Main.hs](https://github.com/ljdoig/GuessTheChord/blob/main/Main.hs) is the 
-driver that was supplied with the project.
+
+The wordlists are from [here](https://github.com/Kinkelin/WordleCompetition).
+
+* [Wordle.hs](./Wordle.hs) contains the logic for running a Wordle game  
+* [WordleGuesser.hs](./WordleGuesser.hs) implements a Guesser to play Wordle
+
+This project was modified from a Declarative Programming (COMP30020) project. 
+
