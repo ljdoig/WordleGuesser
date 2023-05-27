@@ -11,15 +11,17 @@ main = do
   hSetBuffering stdout NoBuffering
   guesses <- lines <$> readFile "wordlists/wordle_guesses.txt"
   answers <- lines <$> readFile "wordlists/wordle_answers.txt"
-  putStrLn "You have 6 options:"
+  putStrLn "You have 7 options:"
   putStrLn " 1) Watch WordleGuesser guess a random Wordle word"
   putStrLn " 2) Watch WordleGuesser guess a Wordle word of your choosing"
   putStrLn " 3) Compete against WordleGuesser to guess a random Wordle word the fastest!"
-  putStrLn " 4) Watch WordleGuesser guess 10 random Wordle words, and see the average score"
-  putStrLn " 5) Test WordleGuesser on all 2315 Wordle words (takes a long time)"
-  putStrLn " 6) Play a standard game of Wordle yourself"
+  putStrLn " 4) Use WordleGuesser to cheat, by entering its suggestions and relaying feedback"
+  putStrLn " 5) Watch WordleGuesser guess 10 random Wordle words, and see the average score"
+  putStrLn " 6) Test WordleGuesser on all 2315 Wordle words (takes a long time)"
+  putStrLn " 7) Play a standard game of Wordle yourself"
   putStr "Enter your chosen number: "
   input <- getLine
+  putStrLn ""
   case input of
     "1" -> do
       playWordleBot guesses answers guesser Nothing
@@ -45,24 +47,26 @@ main = do
             else do
               putStrLn "The machine wins, unlucky."
     "4" -> do
+      cheatWordleBot guesses answers guesser
+    "5" -> do
       let n = 10
       let scores = [playWordleBot guesses answers guesser Nothing | _ <- [1 .. n]]
       total <- foldr sumIO (return 0) scores
       let avg_score = fromIntegral total / fromIntegral n
       putStrLn $ "Average score: " ++ show avg_score
-    "5" -> do
+    "6" -> do
       putStrLn "Please wait..."
       let scores = testWordleBot guesses answers guesser
       let avg_score = fromIntegral (sum scores) / fromIntegral (length scores)
       putStrLn $ "Average score: " ++ show avg_score
       print scores
-    "6" -> do
+    "7" -> do
       _ <- playWordle guesses answers Nothing
       return ()
     _ -> do
       putStrLn "Invalid option"
       main
-  putStr "Hit enter to do something else: "
+  putStr "Hit enter to continue: "
   _ <- getLine
   putStrLn "\n"
   main

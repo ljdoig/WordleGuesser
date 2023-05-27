@@ -6,6 +6,7 @@ module Wordle
     getFeedback,
     playWordle,
     playWordleBot,
+    cheatWordleBot,
     testWordleBot,
     getRandomAnswer,
   )
@@ -32,6 +33,8 @@ data Guesser guesserState = Guesser
 type GetNextGuess guesserState = (Guess, guesserState) -> GuessFeedback -> (Guess, guesserState)
 
 numAllowedGuesses = 6
+
+wordLength = 5
 
 failurePenalty = 4
 
@@ -106,6 +109,49 @@ playWordleBotTurn answer getNextGuess (guess, guesserState) n = do
         else do
           let (guess', guesserState') = getNextGuess (guess, guesserState) feedback
           playWordleBotTurn answer getNextGuess (guess', guesserState') (n + 1)
+
+cheatWordleBot :: [Guess] -> [Answer] -> Guesser guesserState -> IO ()
+cheatWordleBot guesses answers (Guesser initialGuess getNextGuess) = do
+  putStrLn "Each turn, enter the suggested word and enter the feedback you get back"
+  putStrLn "Your feedback must be 5 characters each either g, y, b e.g. \"gbygb\""
+  putStrLn "representing the 3 colours: Green, Yellow and Black"
+  putStrLn "If you have won, just enter \"g\""
+  let (guess, state) = initialGuess guesses answers
+  cheatWordleBotTurn getNextGuess (guess, state) 1
+
+getInputFeedback :: IO GuessFeedback
+getInputFeedback = do
+  putStr "Feedback: "
+  input <- getLine
+  if input == "g"
+    then return $ replicate 5 Correct
+    else do
+      if length input == wordLength && all (`elem` "gyb") input
+        then return (map letterFeedback input)
+        else do
+          putStrLn "Invalid feedback string, try again"
+          getInputFeedback
+  where
+    letterFeedback c = case c of
+      'g' -> Correct
+      'y' -> WrongPosition
+      'b' -> Wrong
+
+cheatWordleBotTurn :: GetNextGuess guesserState -> (Guess, guesserState) -> Int -> IO ()
+cheatWordleBotTurn getNextGuess (guess, guesserState) n = do
+  putStrLn $ "Enter guess: " ++ guess
+  feedback <- getInputFeedback
+  printColoured guess feedback
+  if hasWon feedback
+    then do
+      putStrLn $ "WordleGuesser got it in " ++ show n ++ " guesses!"
+    else do
+      if n == numAllowedGuesses
+        then do
+          putStrLn "WordleGuesser didn't get it..."
+        else do
+          let (guess', guesserState') = getNextGuess (guess, guesserState) feedback
+          cheatWordleBotTurn getNextGuess (guess', guesserState') (n + 1)
 
 testWordleBot :: [Guess] -> [Answer] -> Guesser guesserState -> [Int]
 testWordleBot guesses answers (Guesser initialGuess getNextGuess) =
