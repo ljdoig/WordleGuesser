@@ -18,9 +18,7 @@
 module WordleGuesser (guesser) where
 
 import Data.List (delete, group, maximumBy, sort, subsequences)
-import Data.Maybe (fromJust)
 import Data.Ord (comparing)
-import Text.Read (readMaybe)
 import Wordle
 
 type State = ([Guess], [Answer])
@@ -28,13 +26,11 @@ type State = ([Guess], [Answer])
 guesser :: Guesser State
 guesser = Guesser initialGuess getNextGuess
 
--- | A tuple containing the first guess guessed and the list of remaining
--- answers to guess in future. The guess was initially calculated using
--- 'maxEntropyGuess allGuesss', but was then hardcoded to save time.
+-- | Called to generate the first guess and corresponding state that is passed to
+-- future calls. Takes a list of possible guesses and answers to setup game.
 initialGuess :: [Guess] -> [Answer] -> (Guess, State)
 initialGuess guesses answers = (guess, (delete guess guesses, delete guess answers))
   where
-    -- guess = maxEntropyGuess guesses answers
     guess = "soare"
 
 -- | Takes a tuple containing the guessed guess and remaining answers from the
@@ -42,12 +38,15 @@ initialGuess guesses answers = (guess, (delete guess guesses, delete guess answe
 -- are filtered down to those consistent with the feedback, and the getNextGuess
 -- is selected from the filtered answers using maxEntropyGuess.
 getNextGuess :: (Guess, State) -> GuessFeedback -> (Guess, State)
-getNextGuess (oldGuess, (oldPotentialGuesses, oldPotentialAnswers)) feedback =
+getNextGuess (oldGuess, (potentialGuesses, oldPotentialAnswers)) feedback =
   (newGuess, (delete newGuess potentialGuesses, delete newGuess potentialAnswers))
   where
     potentialAnswers = consistentAnswers feedback oldGuess oldPotentialAnswers
-    potentialGuesses = consistentAnswers feedback oldGuess oldPotentialGuesses
-    newGuess = maxEntropyGuess potentialGuesses potentialAnswers
+    newGuess =
+      case potentialAnswers of
+        [answer] -> answer
+        [answer, _] -> answer
+        _ -> maxEntropyGuess potentialGuesses potentialAnswers
 
 -- | Takes a feedback, the guess that generated the feedback and a list of
 -- answers. Returns a filtered version of the list of answers, containing only
@@ -55,8 +54,9 @@ getNextGuess (oldGuess, (oldPotentialGuesses, oldPotentialAnswers)) feedback =
 consistentAnswers :: GuessFeedback -> Guess -> [Answer] -> [Answer]
 consistentAnswers feedback guess = filter ((== feedback) . getFeedback guess)
 
--- | Takes a list of potential guesses. Returns the one with the highest 'guessEntropy'.
-maxEntropyGuess :: [Guess] -> [Answer] -> Guess
+-- | Takes a list of potential guesses and answers. Returns the guess which
+-- produces the highest entropy among the answers according to 'guessEntropy'.
+maxEntropyGuess :: [Guess] -> [Answer] -> Answer
 maxEntropyGuess guesses answers = maximumBy (comparing (guessEntropy answers)) guesses
 
 -- | Takes a list of answers and a potential guess. Calculates all the

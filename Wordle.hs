@@ -5,13 +5,13 @@ module Wordle
     Guesser (Guesser),
     getFeedback,
     playWordle,
-    playWordleBotRandom,
     playWordleBot,
     testWordleBot,
+    getRandomAnswer,
   )
 where
 
-import Data.Char (toUpper)
+import Data.Char (toLower, toUpper)
 import Data.List (all)
 import System.Random (randomIO)
 
@@ -33,16 +33,35 @@ type GetNextGuess guesserState = (Guess, guesserState) -> GuessFeedback -> (Gues
 
 numAllowedGuesses = 6
 
-playWordle :: [Guess] -> [Answer] -> IO ()
-playWordle guesses answers = do
+failurePenalty = 4
+
+getRandomAnswer :: [Answer] -> IO Answer
+getRandomAnswer answers = do
   randInt <- randomIO :: IO Int
-  let answer = answers !! mod randInt (length answers)
+  return $ answers !! mod randInt (length answers)
+
+chooseAnswer :: [Answer] -> Maybe Answer -> IO Answer
+chooseAnswer answers maybeAnswer =
+  case maybeAnswer of
+    Just answer ->
+      if answer `elem` answers
+        then return answer
+        else do
+          putStrLn "Not a valid Wordle answer, defaulting to a random choice"
+          getRandomAnswer answers
+    Nothing -> getRandomAnswer answers
+
+playWordle :: [Guess] -> [Answer] -> Maybe Answer -> IO Int
+playWordle guesses answers maybeAnswer = do
+  putStrLn "Beginning the game!"
+  answer <- chooseAnswer answers maybeAnswer
   playWordleTurn guesses answer 1
 
-playWordleTurn :: [Guess] -> Answer -> Int -> IO ()
+playWordleTurn :: [Guess] -> Answer -> Int -> IO Int
 playWordleTurn guesses answer n = do
   putStr $ "Enter guess #" ++ show n ++ ": "
-  guess <- getLine
+  input <- getLine
+  let guess = map toLower input
   if guess `notElem` guesses
     then do
       putStrLn "Invalid guess, try again"
@@ -53,38 +72,25 @@ playWordleTurn guesses answer n = do
       if hasWon feedback
         then do
           putStrLn $ "You got it in " ++ show n ++ " guesses!"
+          return n
         else do
           if n == numAllowedGuesses
             then do
               putStrLn "You didn't get it..."
-              printPlain answer
+              printAnswer answer
+              return $ n + failurePenalty
             else do
               playWordleTurn guesses answer (n + 1)
 
-failurePenalty = 4
-
-playWordleBot :: [Guess] -> [Answer] -> Answer -> Guesser guesserState -> IO Int
-playWordleBot guesses answers answer guesser =
-  if answer `elem` answers
-    then beginWordleBotGame guesses answers answer guesser
-    else do
-      putStrLn "Not a valid Wordle answer, defaulting to a random choice"
-      playWordleBotRandom guesses answers guesser
-
-playWordleBotRandom :: [Guess] -> [Answer] -> Guesser guesserState -> IO Int
-playWordleBotRandom guesses answers guesser = do
-  randInt <- randomIO :: IO Int
-  let answer = answers !! mod randInt (length answers)
-  beginWordleBotGame guesses answers answer guesser
-
-beginWordleBotGame :: [Guess] -> [Answer] -> Answer -> Guesser guesserState -> IO Int
-beginWordleBotGame guesses answers answer (Guesser initialGuess getNextGuess) = do
+playWordleBot :: [Guess] -> [Answer] -> Guesser guesserState -> Maybe Answer -> IO Int
+playWordleBot guesses answers (Guesser initialGuess getNextGuess) maybeAnswer = do
+  putStrLn "Beginning the game!"
+  answer <- chooseAnswer answers maybeAnswer
   let (guess, state) = initialGuess guesses answers
-  putStrLn "Beginning the Wordle game!"
-  wordleBotTurn answer getNextGuess (guess, state) 1
+  playWordleBotTurn answer getNextGuess (guess, state) 1
 
-wordleBotTurn :: Answer -> GetNextGuess guesserState -> (Guess, guesserState) -> Int -> IO Int
-wordleBotTurn answer getNextGuess (guess, guesserState) n = do
+playWordleBotTurn :: Answer -> GetNextGuess guesserState -> (Guess, guesserState) -> Int -> IO Int
+playWordleBotTurn answer getNextGuess (guess, guesserState) n = do
   let feedback = getFeedback guess answer
   printColoured guess feedback
   if hasWon feedback
@@ -95,16 +101,17 @@ wordleBotTurn answer getNextGuess (guess, guesserState) n = do
       if n == numAllowedGuesses
         then do
           putStrLn "WordleGuesser didn't get it..."
-          printPlain answer
+          printAnswer answer
           return $ n + failurePenalty
         else do
           let (guess', guesserState') = getNextGuess (guess, guesserState) feedback
-          wordleBotTurn answer getNextGuess (guess', guesserState') (n + 1)
+          playWordleBotTurn answer getNextGuess (guess', guesserState') (n + 1)
 
-testWordleBot :: [Guess] -> [Answer] -> Answer -> Guesser guesserState -> Int
-testWordleBot guesses answers answer (Guesser initialGuess getNextGuess) =
-  let (guess, state) = initialGuess guesses answers
-   in testWordleBotTurn answer getNextGuess (guess, state) 1
+testWordleBot :: [Guess] -> [Answer] -> Guesser guesserState -> [Int]
+testWordleBot guesses answers (Guesser initialGuess getNextGuess) =
+  let testAnswer answer =
+        testWordleBotTurn answer getNextGuess (initialGuess guesses answers) 1
+   in map testAnswer answers
 
 testWordleBotTurn :: Answer -> GetNextGuess guesserState -> (Guess, guesserState) -> Int -> Int
 testWordleBotTurn answer getNextGuess (guess, guesserState) n = do
@@ -120,15 +127,16 @@ testWordleBotTurn answer getNextGuess (guess, guesserState) n = do
 
 printColoured :: Guess -> GuessFeedback -> IO ()
 printColoured (c : cs) (f : fs) = do
+  let s = [toUpper c]
   case f of
-    Correct -> putStr $ "\ESC[32m " ++ [toUpper c]
-    WrongPosition -> putStr $ "\ESC[33m " ++ [toUpper c]
-    Wrong -> putStr $ "\ESC[31m " ++ [toUpper c]
+    Correct -> putStr $ "\ESC[32m " ++ s
+    WrongPosition -> putStr $ "\ESC[33m " ++ s
+    Wrong -> putStr $ "\ESC[31m " ++ s
   printColoured cs fs
 printColoured _ _ = putStrLn "\ESC[0m"
 
-printPlain :: Answer -> IO ()
-printPlain answer = putStrLn $ "The answer was:\n" ++ concatMap (\c -> [' ', toUpper c]) answer
+printAnswer :: Answer -> IO ()
+printAnswer answer = putStrLn $ "The answer was:\n" ++ concatMap (\c -> [' ', toUpper c]) answer
 
 hasWon :: GuessFeedback -> Bool
 hasWon = all (== Correct)
