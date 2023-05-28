@@ -42,11 +42,7 @@ getNextGuess (oldGuess, (potentialGuesses, oldPotentialAnswers)) feedback =
   (newGuess, (delete newGuess potentialGuesses, delete newGuess potentialAnswers))
   where
     potentialAnswers = consistentAnswers feedback oldGuess oldPotentialAnswers
-    newGuess =
-      case potentialAnswers of
-        [answer] -> answer
-        [answer, _] -> answer
-        _ -> maxEntropyGuess potentialGuesses potentialAnswers
+    newGuess = maxEntropyGuess potentialGuesses potentialAnswers
 
 -- | Takes a feedback, the guess that generated the feedback and a list of
 -- answers. Returns a filtered version of the list of answers, containing only
@@ -63,9 +59,10 @@ maxEntropyGuess guesses answers = maximumBy (comparing (guessEntropy answers)) g
 -- feedbacks that could be received from the answers if that guess was made,
 -- and returns the entropy of that feedback.
 guessEntropy :: [Answer] -> Guess -> Double
-guessEntropy answers guess = entropy potentialFeedbacks
+guessEntropy answers guess = entropy potentialFeedbacks + bonus
   where
     potentialFeedbacks = map (getFeedback guess) answers
+    bonus = if guess `elem` answers then 0.001 else 0
 
 -- | Takes a list containing elements of an ordered type. Returns Shannon's
 -- entropy of the list in bits.
