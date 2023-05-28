@@ -29,7 +29,7 @@ guesser = Guesser initialGuess getNextGuess
 -- | Called to generate the first guess and corresponding state that is passed to
 -- future calls. Takes a list of possible guesses and answers to setup game.
 initialGuess :: [Guess] -> [Answer] -> (Guess, State)
-initialGuess guesses answers = (guess, (delete guess guesses, delete guess answers))
+initialGuess guesses answers = (guess, (guesses, answers))
   where
     guess = "soare"
 
@@ -38,10 +38,12 @@ initialGuess guesses answers = (guess, (delete guess guesses, delete guess answe
 -- are filtered down to those consistent with the feedback, and the getNextGuess
 -- is selected from the filtered answers using maxEntropyGuess.
 getNextGuess :: (Guess, State) -> GuessFeedback -> (Guess, State)
-getNextGuess (oldGuess, (potentialGuesses, oldPotentialAnswers)) feedback =
-  (newGuess, (delete newGuess potentialGuesses, delete newGuess potentialAnswers))
+getNextGuess (oldGuess, (oldPotentialGuesses, oldPotentialAnswers)) feedback =
+  (newGuess, (potentialGuesses, potentialAnswers))
   where
-    potentialAnswers = consistentAnswers feedback oldGuess oldPotentialAnswers
+    potentialGuesses = delete oldGuess oldPotentialGuesses
+    potentialAnswers' = delete oldGuess oldPotentialAnswers
+    potentialAnswers = consistentAnswers feedback oldGuess potentialAnswers'
     newGuess = maxEntropyGuess potentialGuesses potentialAnswers
 
 -- | Takes a feedback, the guess that generated the feedback and a list of

@@ -66,8 +66,6 @@ main = do
     _ -> do
       putStrLn "Invalid option"
       main
-  putStr "Hit enter to continue: "
-  _ <- getLine
   putStrLn "\n"
   main
 
