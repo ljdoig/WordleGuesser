@@ -66,25 +66,23 @@ playWordleTurn guesses answer n = do
   putStr $ "Enter guess #" ++ show n ++ ": "
   input <- getLine
   let guess = map toLower input
-  if guess `notElem` guesses
-    then do
+  let feedback = getFeedback guess answer
+  case (guess `notElem` guesses, hasWon feedback, n == numAllowedGuesses) of
+    (True, _, _) -> do
       putStrLn "Invalid guess, try again"
       playWordleTurn guesses answer n
-    else do
-      let feedback = getFeedback guess answer
+    (_, True, _) -> do
       printColoured guess feedback
-      if hasWon feedback
-        then do
-          putStrLn $ "You got it in " ++ show n ++ " guesses!"
-          return n
-        else do
-          if n == numAllowedGuesses
-            then do
-              putStrLn "You didn't get it..."
-              printAnswer answer
-              return $ n + failurePenalty
-            else do
-              playWordleTurn guesses answer (n + 1)
+      putStrLn $ "You got it in " ++ show n ++ " guesses!"
+      return n
+    (_, _, True) -> do
+      printColoured guess feedback
+      putStrLn "You didn't get it..."
+      printAnswer answer
+      return $ n + failurePenalty
+    _ -> do
+      printColoured guess feedback
+      playWordleTurn guesses answer (n + 1)
 
 playWordleBot :: [Guess] -> [Answer] -> Guesser guesserState -> Maybe Answer -> IO Int
 playWordleBot guesses answers (Guesser initialGuess getNextGuess) maybeAnswer = do
@@ -97,19 +95,17 @@ playWordleBotTurn :: Answer -> GetNextGuess guesserState -> (Guess, guesserState
 playWordleBotTurn answer getNextGuess (guess, guesserState) n = do
   let feedback = getFeedback guess answer
   printColoured guess feedback
-  if hasWon feedback
-    then do
+  case (hasWon feedback, n == numAllowedGuesses) of
+    (True, _) -> do
       putStrLn $ "WordleGuesser got it in " ++ show n ++ " guesses!"
       return n
-    else do
-      if n == numAllowedGuesses
-        then do
-          putStrLn "WordleGuesser didn't get it..."
-          printAnswer answer
-          return $ n + failurePenalty
-        else do
-          let (guess', guesserState') = getNextGuess (guess, guesserState) feedback
-          playWordleBotTurn answer getNextGuess (guess', guesserState') (n + 1)
+    (_, True) -> do
+      putStrLn "WordleGuesser didn't get it..."
+      printAnswer answer
+      return $ n + failurePenalty
+    _ ->
+      let (guess', guesserState') = getNextGuess (guess, guesserState) feedback
+       in playWordleBotTurn answer getNextGuess (guess', guesserState') (n + 1)
 
 cheatWordleBot :: [Guess] -> [Answer] -> Guesser guesserState -> IO ()
 cheatWordleBot guesses answers (Guesser initialGuess getNextGuess) = do
@@ -125,8 +121,7 @@ getInputGuess suggestedGuess guesses = do
   putStr $ "Enter guess (suggested: " ++ suggestedGuess ++ "): "
   input <- getLine
   let guess = map toLower input
-  let valid = guess `elem` guesses
-  case (input, valid) of
+  case (input, guess `elem` guesses) of
     ("", _) -> return Nothing
     (_, True) -> return $ Just guess
     _ -> do
@@ -157,9 +152,7 @@ cheatWordleBotTurn guesses getNextGuess (guess, guesserState) n = do
   case (guess, feedback) of
     (Just guess, Just feedback) -> do
       printColoured guess feedback
-      let won = hasWon feedback
-      let lastGuess = n == numAllowedGuesses
-      case (won, lastGuess) of
+      case (hasWon feedback, n == numAllowedGuesses) of
         (True, _) -> putStrLn $ "WordleGuesser got it in " ++ show n ++ " guesses!"
         (_, True) -> putStrLn "WordleGuesser didn't get it..."
         _ ->
@@ -174,16 +167,17 @@ testWordleBot guesses answers (Guesser initialGuess getNextGuess) =
    in map testAnswer answers
 
 testWordleBotTurn :: Answer -> GetNextGuess guesserState -> (Guess, guesserState) -> Int -> Int
-testWordleBotTurn answer getNextGuess (guess, guesserState) n = do
-  let feedback = getFeedback guess answer
-  if hasWon feedback
-    then n
-    else
-      if n == numAllowedGuesses
-        then n + failurePenalty
-        else do
-          let (guess', guesserState') = getNextGuess (guess, guesserState) feedback
-          testWordleBotTurn answer getNextGuess (guess', guesserState') (n + 1)
+testWordleBotTurn answer getNextGuess (guess, guesserState) n =
+  case (won, lastGuess) of
+    (True, _) -> n
+    (_, True) -> n + failurePenalty
+    _ ->
+      let (guess', guesserState') = getNextGuess (guess, guesserState) feedback
+       in testWordleBotTurn answer getNextGuess (guess', guesserState') (n + 1)
+  where
+    feedback = getFeedback guess answer
+    won = hasWon feedback
+    lastGuess = n == numAllowedGuesses
 
 printColoured :: Guess -> GuessFeedback -> IO ()
 printColoured (c : cs) (f : fs) = do
