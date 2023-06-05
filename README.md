@@ -10,10 +10,18 @@ Source files:
 * [Main.hs](./Main.hs) implements a simple program for users to interact with the WordleGuesser or play Wordle on the command-line
 
 
-This has been compiled to a [MacOS executable](./Wordle) with:
-```
-ghc -O2 Main.hs -o Wordle
-```
+The project has been compiled to a [MacOS executable](./Wordle).
+
+## Functionality
+The Main module allows the following options:
+* Watch WordleGuesser guess a random Wordle word
+* Watch WordleGuesser guess a Wordle word of your choosing
+* Compete against WordleGuesser to guess a random Wordle word the fastest
+* Use WordleGuesser to cheat (relaying your feedback and optionally using suggestions)
+* Play a standard game of Wordle yourself
+
+
+All except the last showcase the WordleGuesser's abilities.
 
 ## The approach in more detail
 Each guess we trim down the set of possible guesses to the ones consistent with the feedback we received from our last guess. 
